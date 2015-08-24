@@ -1,10 +1,10 @@
 '''
 Coursera:
 - Software Defined Networking (SDN) course
--- Simple Router with ACL (P4 Assignment)
+-- Module 8 Programming Assignment
 
 Professor: Nick Feamster
-Teaching Assistant: Arpit Gupta, Muhammad Shahbaz
+Teaching Assistant: Arpit Gupta
 '''
 
 ### The only things you'll have to edit (unless you're porting this script over to a different language)
@@ -148,34 +148,115 @@ def source(partIdx):
 
 ############ BEGIN ASSIGNMENT SPECIFIC CODE - YOU'LL HAVE TO EDIT THIS ##############
 
-import subprocess
+from mininet.topo import Topo
+from mininet.net import Mininet
+from mininet.node import RemoteController
+from mininet.node import CPULimitedHost
+from mininet.link import TCLink
+from mininet.util import irange,dumpNodeConnections
+from mininet.log import setLogLevel
+from mininet.cli import CLI
+import os, time
 
 # Make sure you change this string to the last segment of your class URL.
 # For example, if your URL is https://class.coursera.org/pgm-2012-001-staging, set it to "pgm-2012-001-staging".
 URL = 'sdn1-001'
 
 # the "Identifier" you used when creating the part
-partIds = ['agPA52']
+partIds = ['agPA81', 'agPA82', 'agPA83']
+
 # used to generate readable run-time information for students
-partFriendlyNames = ['Simple Router with ACL']
+partFriendlyNames = [' Host Gardenwall', 'Pox Gardenwall', 'Pyretic Gardenwall']
+
 # source files to collect (just for our records)
-sourceFiles = ['./p4src/simple_router_acl.p4',
-               './p4src/includes/headers.p4',
-               './p4src/includes/parser.p4']
+sourceFiles = ['%s/pyretic/pyretic/kinetic/examples/gardenwall.py' % os.environ[ 'HOME' ],
+               '%s/pox/pox/misc/gardenwall.py' % os.environ[ 'HOME' ],
+               '%s/pyretic/pyretic/examples/gardenwall.py' % os.environ[ 'HOME' ]]
+
+
+# My network topology
+class MyTopo(Topo):
+    def __init__(self, **opts):
+        # Initialize topology and default options
+        Topo.__init__(self, **opts)
+
+        s1 = self.addSwitch('s1')
+        h1 = self.addHost('h1')
+        self.addLink(h1, s1)
+        h2 = self.addHost('h2')
+        self.addLink(h2, s1)
+        h3 = self.addHost('h3')
+        self.addLink(h3, s1)
+
 
 def output(partIdx):
   """Uses the student code to compute the output for test cases."""
   outputString = ''
 
-  if partIdx == 0: # This is agPA52
-    command = ['python', 'run_tests.py', '--test-dir=of-tests/tests/']
-    proc = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    _, output = proc.communicate()
+  if partIdx == 0:
+    # Kinetic
+    print "a. Firing up Mininet"
+    net = Mininet(topo=MyTopo(),
+                  controller=lambda name: RemoteController( 'c0', '127.0.0.1' ),
+                  host=CPULimitedHost, link=TCLink,
+                  autoSetMacs=True, autoStaticArp=True)
+    net.start()
 
-    print output
+    h1 = net.get('h1')
+    h2 = net.get('h2')
 
-    outputString = output
+    print "b. Starting Test"
+    # Start pings
+    outputString += h1.cmdPrint('ping', '-c5', '10.0.0.2')
 
+    # Send infect True event
+    print "b.1 Sending Infect (True) Event"
+    os.system('python json_sender.py -n infected -l True --flow="{srcip=10.0.0.1}" -a 127.0.0.1 -p 50001 &')
+    time.sleep(2)
+    outputString += h1.cmdPrint('ping', '-c5', '10.0.0.2')
+    # Send exempt True event
+    print "b.2 Sending Exempt (True) Event"
+    os.system('python json_sender.py -n exempt -l True --flow="{srcip=10.0.0.1}" -a 127.0.0.1 -p 50001 &')
+    time.sleep(2)
+    outputString += h1.cmdPrint('ping', '-c5', '10.0.0.2')
+
+    print "c. Stopping Mininet"
+    net.stop()
+
+  if partIdx == 1 or partIdx == 2:
+    # Pyretic/POX
+    print "a. Firing up Mininet"
+    net = Mininet(topo=MyTopo(),
+                  controller=lambda name: RemoteController( 'c0', '127.0.0.1' ),
+                  host=CPULimitedHost, link=TCLink,
+                  autoSetMacs=True, autoStaticArp=True)
+    net.start()
+
+    h1 = net.get('h1')
+    h2 = net.get('h2')
+
+    print "b. Starting Test"
+    # Start pings
+    outputString += h1.cmdPrint('ping', '-c5', '10.0.0.2')
+
+    # Send infect True event
+    print "b.1 Sending Infect (True) Event"
+    os.system('python json_sender.py -n infected -l True --flow="{srcmac=00:00:00:00:00:01}" -a 127.0.0.1 -p 50001 &')
+    time.sleep(2)
+    outputString += h1.cmdPrint('ping', '-c5', '10.0.0.2')
+
+    # Send exempt True event
+    print "b.2 Sending Exempt (True) Event"
+    os.system('python json_sender.py -n exempt -l True --flow="{srcmac=00:00:00:00:00:01}" -a 127.0.0.1 -p 50001 &')
+    time.sleep(2)
+    outputString += h1.cmdPrint('ping', '-c5', '10.0.0.2')
+
+    print "c. Stopping Mininet"
+    net.stop()
+
+  #print outputString
   return outputString.strip()
 
+
 submit()
+#output(2)

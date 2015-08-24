@@ -15,7 +15,7 @@ from pox.lib.addresses import EthAddr
 from collections import namedtuple
 import os
 ''' Add your imports here ... '''
-
+import csv
 
 
 log = core.getLogger()
@@ -30,6 +30,11 @@ class Firewall (EventMixin):
     def __init__ (self):
         self.listenTo(core.openflow)
         log.debug("Enabling Firewall Module")
+		
+        with open(policyFile,'rb') as csvFile:
+		    policy = csv.reader(csvFile)
+            for policy_line in policy:
+                print ', '.join(policy_line)
 
     def _handle_ConnectionUp (self, event):
         ''' Add your logic here ... '''
